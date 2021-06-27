@@ -64,3 +64,86 @@ loss_object = tf.keras.losses.SparseCategoricalCrossentropy(from_logits= True)
 
 loss_history = []
 
+
+def train_step(images, labels):
+    with tf.GradientTape() as tape:
+        logits = mnist_model(images, training = True)
+
+        tf.debugging.assert_equal(logits.shape, (32,10))
+
+        loss_value = loss_object(labels,logits)
+
+    loss_history.append(loss_value.numpy().mean())
+    grads = tape.gradient(loss_value, mnist_model.trainable_variables)
+    optimizer.apply_gradients(zip(grads, mnist_model.trainable_variables))
+
+
+def train(epochs):
+    for epoch in range(epochs):
+        for (batch, (images,labels)) in enumerate(dataset):
+            train_step(images,labels)
+        print("Epoch {} finished".format(epoch))
+
+#train(epochs=3)
+
+import matplotlib.pyplot as plt
+
+#plt.plot(loss_history)
+#plt.xlabel("Batch #")
+#plt.ylabel("loss [entropy]")
+#plt.show()
+
+###################################################
+###################################################
+###################################################
+class Linear(tf.keras.Model):
+  def __init__(self):
+    super(Linear, self).__init__()
+    self.W = tf.Variable(5., name='weight')
+    self.B = tf.Variable(10., name='bias')
+  def call(self, inputs):
+    return inputs * self.W + self.B
+
+
+NUM_EXAMPLES = 2000
+training_inputs = tf.random.normal([NUM_EXAMPLES])
+noise = tf.random.normal([NUM_EXAMPLES])
+training_outputs  = training_inputs * 3 + 2 +noise
+
+#The loss function to be optimized
+
+def loss(model, inputs, targets):
+    error = model(inputs) - targets
+    return tf.reduce_mean(tf.square(error))
+
+def grad(model, inputs, targets):
+    with tf.GradientTape() as tape:
+        loss_value = loss(model, inputs, targets)
+    return tape.gradient(loss_value, [model.W, model.B])
+
+model = Linear()
+optimizer = tf.keras.optimizers.SGD(learning_rate = 0.01)
+
+print("Initial loss: {:.3f}".format(loss(model, training_inputs, training_outputs)))
+
+
+steps = 300
+for i in range(steps):
+    grads = grad(model, training_inputs, training_outputs)
+    optimizer.apply_gradients(zip(grads,[model.W,model.B]))
+    if i %20 == 0 :
+        print("Loss at step {:03d}: {:.3f}".format(i, loss(model, training_inputs, training_outputs)))
+
+print("Final loss: {:.3f}".format(loss(model, training_inputs, training_outputs)))
+print("W = {}, B = {}".format(model.W.numpy(), model.B.numpy()))
+
+
+model.save_weights("weights")
+status = model.load_weights("weights")
+
+x = tf.Variable(10.)
+checkpoint = tf.train.Checkpoint(x=x)
+
+x.assign(2.)
+checkpoint_path = "./ckpt/"
+checkpoint.save(checkpoint_path)
